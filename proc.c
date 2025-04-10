@@ -6,6 +6,7 @@
 #include "x86.h"
 #include "proc.h"
 #include "spinlock.h"
+#include "pstat.h"
 
 struct {
   struct spinlock lock;
@@ -138,6 +139,8 @@ userinit(void)
   p->tf->eflags = FL_IF;
   p->tf->esp = PGSIZE;
   p->tf->eip = 0;  // beginning of initcode.S
+  p->ticks = 0;
+  p->tickets = 10;
 
   safestrcpy(p->name, "initcode", sizeof(p->name));
   p->cwd = namei("/");
@@ -200,6 +203,16 @@ fork(void)
   np->parent = curproc;
   *np->tf = *curproc->tf;
 
+  np->ticks = 0;
+  if (np->parent->tickets > 10)
+  {
+    np->tickets = curproc->tickets;
+  }
+  else
+  {
+    np->tickets = 10;
+  }
+
   // Clear %eax so that fork returns 0 in the child.
   np->tf->eax = 0;
 
@@ -219,6 +232,55 @@ fork(void)
   release(&ptable.lock);
 
   return pid;
+}
+
+void
+fillpstat(pstatTable * pstat)
+{
+  int i = 0;
+  struct proc *p;
+  int j;
+
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++, i++)
+  {
+    if(p->state == UNUSED)
+    {
+      (*pstat)[i].inuse = 0;
+    }
+    else
+    {
+      (*pstat)[i].inuse = 1;
+      (*pstat)[i].tickets = p->tickets;
+      (*pstat)[i].pid = p->pid;
+      (*pstat)[i].ticks = p->ticks;
+      for(j = 0; j < 16; j++)
+      {
+        (*pstat)[i].name[j] = p->name[j];
+      }
+      char tempState = ' ';
+      if(p->state == EMBRYO)
+      {
+        tempState = 'E';
+      }
+      else if(p->state == SLEEPING)
+      {
+        tempState = 'S';
+      }
+      else if(p->state == RUNNABLE)
+      {
+        tempState = 'A';
+      }
+      else if(p->state == RUNNING)
+      {
+        tempState = 'R';
+      }
+      else if(p->state == ZOMBIE)
+      {
+        tempState = 'Z';
+      }
+      (*pstat)[i].state = tempState;
+    }
+  }
 }
 
 // Exit the current process.  Does not return.

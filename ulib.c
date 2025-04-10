@@ -3,6 +3,38 @@
 #include "fcntl.h"
 #include "user.h"
 #include "x86.h"
+#include "pstat.h"
+#include "syscall.h"
+
+void
+ps(void)
+{
+  pstatTable p;
+  
+  getpinfo(&p);
+ 
+  printf(1, "PID\tTKTS\tTCKS\tSTAT\tNAME\n");
+ 
+  int i;
+  for(i = 0; i < NPROC; i++)
+  {
+    if(p[i].inuse)
+    {
+      printf(1, "%d\t%d\t%d\t%c\t%s\n",
+             p[i].pid,
+	     p[i].tickets,
+	     p[i].ticks,
+	     p[i].state,
+	     p[i].name);
+    }
+  }
+}
+
+void
+setTickets(int ticketArg)
+{
+  settickets(ticketArg);
+}
 
 char*
 strcpy(char *s, const char *t)

@@ -167,6 +167,8 @@ mkfs: mkfs.c fs.h
 .PRECIOUS: %.o
 
 UPROGS=\
+	_tickettest\
+	_ps\
 	_cat\
 	_echo\
 	_forktest\
