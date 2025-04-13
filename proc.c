@@ -8,6 +8,9 @@
 #include "spinlock.h"
 #include "pstat.h"
 
+#define RAND_MAX ((1U << 31) - 1)
+static int rseed = 1898888478;
+
 struct {
   struct spinlock lock;
   struct proc proc[NPROC];
@@ -373,6 +376,12 @@ wait(void)
   }
 }
 
+// Generates a random number that is >= 0 and <= (totaltickets - 1)
+int random()
+{
+   return rseed = (rseed * 1103515245 + 12345) & RAND_MAX;
+}
+
 //PAGEBREAK: 42
 // Per-CPU process scheduler.
 // Each CPU calls scheduler() after setting itself up.
@@ -394,9 +403,28 @@ scheduler(void)
 
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
+    int counter = 0;
+    int winner = random();
+    
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       if(p->state != RUNNABLE)
         continue;
+
+      // Add current p tickets to counter
+      counter = counter + p->tickets;
+    }
+
+    if(counter != 0)
+    {
+      // calculate winner
+      int pWin = winner % counter;
+      for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+      {
+        if(p->state == RUNNABLE && p->tickets > pWin)
+        {
+          break;
+        }
+      }
 
       // Switch to chosen process.  It is the process's job
       // to release ptable.lock and then reacquire it
@@ -404,6 +432,7 @@ scheduler(void)
       c->proc = p;
       switchuvm(p);
       p->state = RUNNING;
+      p->ticks = p->ticks + 1;
 
       swtch(&(c->scheduler), p->context);
       switchkvm();
